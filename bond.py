@@ -13,7 +13,7 @@ class BondSpy:
     #############################################################
 
     url_base = r'http://quotes.money.163.com/bond/%s.html'
-    price_good = float(7.0)
+    price_good = float(7.5)
     price_cache = os.path.join(os.path.dirname(__file__), 'pbond')
 
     #############################################################
