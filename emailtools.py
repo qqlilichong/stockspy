@@ -31,14 +31,14 @@ class EMailSender:
 
     ######################################################
 
-    def sendmail(self, toaddr, subject, body):
+    def sendmail(self, toaddr, subject, body, tfmt='plain'):
         result = None
 
         try:
             if not self.user:
                 return
 
-            msg = MIMEText(body, 'plain', 'utf-8')
+            msg = MIMEText(body, tfmt, 'utf-8')
             msg['From'] = formataddr((Header('EMailSender', 'utf-8').encode(), self.user))
             msg['To'] = ', '.join(toaddr)
             msg['Subject'] = Header(subject, 'utf-8').encode()

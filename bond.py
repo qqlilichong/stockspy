@@ -8,18 +8,54 @@ from selenium import webdriver
 
 #############################################################
 
-class BondSpy:
-
-    #############################################################
-
-    url_base = r'http://quotes.money.163.com/bond/%s.html'
-    price_good = float(7.5)
-    price_cache = os.path.join(os.path.dirname(__file__), 'pbond')
+class PriceSpy:
 
     #############################################################
 
     @staticmethod
-    def ontrading(sleep=1):
+    def run(paramlist):
+        return reactor_reduce(paramlist, PriceSpy.mapper_spy, len(paramlist))
+
+    #############################################################
+
+    @staticmethod
+    def mapper_spy(env):
+        return env['MAIN'](env)
+
+    #############################################################
+
+    @staticmethod
+    def mapper_spy_price(env):
+        options = webdriver.ChromeOptions()
+        options.add_argument(r'headless')
+        browser = webdriver.Chrome(chrome_options=options)
+        timer_notify = TimeDeltaer()
+
+        try:
+            browser.get(env['URL'])
+            tag_price = env['PRICEFINDER'](browser)
+
+            while env['CHECKER_TRADING']():
+                price_real = stof(tag_price.text)
+                env['RT_REAL'] = price_real
+                file_create(env['CACHE'], str(price_real).encode('utf-8'))
+                if price_real < env['NICE']:
+                    continue
+
+                env['RT_PAGESOURCE'] = browser.page_source
+                if timer_notify.check(seconds=300):
+                    env['NOTIFYER'](env)
+
+        finally:
+            print('Spy Bond Price Quit : %s' % env['URL'])
+            browser.close()
+            browser.quit()
+            return 0
+
+    #############################################################
+
+    @staticmethod
+    def checker_trading_bond(sleep=1):
         time.sleep(sleep)
         return True
         # stm = time.struct_time(time.localtime(time.time()))
@@ -30,61 +66,22 @@ class BondSpy:
     #############################################################
 
     @staticmethod
-    def price(paramlist):
-        return reactor_reduce(paramlist, BondSpy.mapper_price, len(paramlist))
+    def pricefinder_bond(browser):
+        return browser.find_element_by_tag_name('big')
 
     #############################################################
 
     @staticmethod
-    def finder_price(browser):
-        tag_price = browser.find_element_by_tag_name('big')
-        return float(tag_price.text)
-
-    #############################################################
-
-    @staticmethod
-    def mapper_price(param):
-        setting, scode = param
-        if scode == 'timer':
-            return BondSpy.mapper_timer()
-
-        options = webdriver.ChromeOptions()
-        options.add_argument(r'headless')
-        browser = webdriver.Chrome(chrome_options=options)
-        url_bond = BondSpy.url_base % scode
-        cache = os.path.join(BondSpy.price_cache, '%s.price' % scode)
-        timer_notify = TimeDeltaer()
-
-        try:
-            browser.get(url_bond)
-            while BondSpy.ontrading():
-                price_real = BondSpy.finder_price(browser)
-                file_create(cache, str(price_real).encode('utf-8'))
-                if price_real < BondSpy.price_good:
-                    continue
-
-                if timer_notify.check(seconds=300):
-                    BondSpy.notify(setting, scode, price_real)
-
-        finally:
-            print('Spy Bond Price Quit : %s' % url_bond)
-            browser.close()
-            browser.quit()
-            return 0
-
-    #############################################################
-
-    @staticmethod
-    def mapper_timer():
+    def timer_bond(env):
         timer = TimeDeltaer()
         timer.check()
-        while BondSpy.ontrading():
+        while env['CHECKER_TRADING']():
             if not timer.check(seconds=60):
                 continue
 
             pricetable = dict()
-            for pf in os.listdir(BondSpy.price_cache):
-                pf = os.path.join(BondSpy.price_cache, pf)
+            for pf in os.listdir(env['CACHE']):
+                pf = os.path.join(env['CACHE'], pf)
                 if pf.endswith('.price'):
                     pricetable[os.path.splitext(os.path.basename(pf))[0]] = stof(file_read(pf))
 
@@ -96,10 +93,18 @@ class BondSpy:
     #############################################################
 
     @staticmethod
-    def notify(setting, scode, price):
-        info = 'Notify Bond Price [ %s : %s ] - %s' % (scode, price, sftime())
+    def notifyer_email_bond(env):
+        ini = configparser.ConfigParser()
+        ini.read(os.path.join(os.path.dirname(__file__), 'stockspy.ini'))
+        setting = dict()
+        setting['email_smtp'] = ini.get('EMAIL', 'smtp').strip()
+        setting['email_user'] = ini.get('EMAIL', 'user').strip()
+        setting['email_pawd'] = ini.get('EMAIL', 'pawd').strip()
+        setting['email_toli'] = ini.get('EMAIL', 'toli').strip().split(',')
+
+        info = 'Notify Bond Price [ %s : %s ] - %s' % (env['SCODE'], env['RT_REAL'], sftime())
         notifyer = EMailSender(setting['email_smtp'], setting['email_user'], setting['email_pawd'])
-        if not notifyer.sendmail(setting['email_toli'], info, info):
+        if not notifyer.sendmail(setting['email_toli'], info, env['RT_PAGESOURCE'], 'html'):
             print('ERROR, %s' % info)
         notifyer.close()
 
@@ -108,40 +113,54 @@ class BondSpy:
 #############################################################
 
 if __name__ == '__main__':
-    # Load Config.
-    ini = configparser.ConfigParser()
-    ini.read(os.path.join(os.path.dirname(__file__), 'stockspy.ini'))
-    config = dict()
-    config['email_smtp'] = ini.get('EMAIL', 'smtp').strip()
-    config['email_user'] = ini.get('EMAIL', 'user').strip()
-    config['email_pawd'] = ini.get('EMAIL', 'pawd').strip()
-    config['email_toli'] = ini.get('EMAIL', 'toli').strip().split(',')
+
+    # All Spy.
+    envlist = list()
+
+    # Init Spy Bond.
+    cache_bond = os.path.join(os.path.dirname(__file__), 'spy_bond')
+    file_remove(cache_bond)
+    file_mkdir(cache_bond)
+    bond_scodelist = [
+        '204001',
+        '204002',
+        '204003',
+        '204004',
+        '204007',
+        '204014',
+        '204028',
+        '204091',
+        '204182',
+        '131810',
+        '131811',
+        '131800',
+        '131809',
+        '131801',
+        '131802',
+        '131803',
+        '131805',
+        '131806',
+    ]
+
+    # Ready Spy Bond.
+    env_bondtimer = dict()
+    env_bondtimer['MAIN'] = PriceSpy.timer_bond
+    env_bondtimer['CHECKER_TRADING'] = PriceSpy.checker_trading_bond
+    env_bondtimer['CACHE'] = cache_bond
+    envlist.append(env_bondtimer)
+    for bond_scode in bond_scodelist:
+        env_bond = dict()
+        env_bond['NICE'] = float(7.5)
+        env_bond['MAIN'] = PriceSpy.mapper_spy_price
+        env_bond['SCODE'] = bond_scode
+        env_bond['URL'] = r'http://quotes.money.163.com/bond/%s.html' % bond_scode
+        env_bond['CACHE'] = os.path.join(cache_bond, '%s.price' % bond_scode)
+        env_bond['CHECKER_TRADING'] = PriceSpy.checker_trading_bond
+        env_bond['PRICEFINDER'] = PriceSpy.pricefinder_bond
+        env_bond['NOTIFYER'] = PriceSpy.notifyer_email_bond
+        envlist.append(env_bond)
 
     # Running Spy.
-    file_mkdir(BondSpy.price_cache)
-    BondSpy.price([
-        (config, 'timer'),
-
-        (config, '204001'),
-        (config, '204002'),
-        (config, '204003'),
-        (config, '204004'),
-        (config, '204007'),
-        (config, '204014'),
-        (config, '204028'),
-        (config, '204091'),
-        (config, '204182'),
-
-        (config, '131810'),
-        (config, '131811'),
-        (config, '131800'),
-        (config, '131809'),
-        (config, '131801'),
-        (config, '131802'),
-        (config, '131803'),
-        (config, '131805'),
-        (config, '131806'),
-    ])
-    exit(0)
+    PriceSpy.run(envlist)
 
 #############################################################

@@ -5,6 +5,7 @@ import os
 import json
 import time
 import datetime
+import shutil
 import multiprocessing
 
 ######################################################
@@ -53,7 +54,7 @@ def file_remove(filename):
             return
 
         if os.path.isdir(filename):
-            os.removedirs(filename)
+            shutil.rmtree(filename)
 
         else:
             os.remove(filename)
