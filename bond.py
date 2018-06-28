@@ -14,18 +14,18 @@ class PriceSpy:
 
     @staticmethod
     def run(paramlist):
-        return reactor_reduce(paramlist, PriceSpy.mapper_spy, len(paramlist))
+        return reactor_reduce(paramlist, PriceSpy.mapper_job, len(paramlist))
 
     #############################################################
 
     @staticmethod
-    def mapper_spy(env):
+    def mapper_job(env):
         return env['MAIN'](env)
 
     #############################################################
 
     @staticmethod
-    def mapper_spy_price(env):
+    def mapper_main(env):
         options = webdriver.ChromeOptions()
         options.add_argument(r'headless')
         browser = webdriver.Chrome(chrome_options=options)
@@ -96,15 +96,14 @@ class PriceSpy:
     def notifyer_email_bond(env):
         ini = configparser.ConfigParser()
         ini.read(os.path.join(os.path.dirname(__file__), 'stockspy.ini'))
-        setting = dict()
-        setting['email_smtp'] = ini.get('EMAIL', 'smtp').strip()
-        setting['email_user'] = ini.get('EMAIL', 'user').strip()
-        setting['email_pawd'] = ini.get('EMAIL', 'pawd').strip()
-        setting['email_toli'] = ini.get('EMAIL', 'toli').strip().split(',')
+        smtp = ini.get('EMAIL', 'smtp').strip()
+        user = ini.get('EMAIL', 'user').strip()
+        pawd = ini.get('EMAIL', 'pawd').strip()
+        toli = ini.get('EMAIL', 'toli').strip().split(',')
 
-        info = 'Notify Bond Price [ %s : %s ] - %s' % (env['SCODE'], env['RT_REAL'], sftime())
-        notifyer = EMailSender(setting['email_smtp'], setting['email_user'], setting['email_pawd'])
-        if not notifyer.sendmail(setting['email_toli'], info, env['RT_PAGESOURCE'], 'html'):
+        info = r'$$[ %s : %s ] - BondPrice - %s$$' % (env['SCODE'], env['RT_REAL'], sftime())
+        notifyer = EMailSender(smtp, user, pawd)
+        if not notifyer.sendmail(toli, info, env['RT_PAGESOURCE'], 'html'):
             print('ERROR, %s' % info)
         notifyer.close()
 
@@ -151,7 +150,7 @@ if __name__ == '__main__':
     for bond_scode in bond_scodelist:
         env_bond = dict()
         env_bond['NICE'] = float(7.5)
-        env_bond['MAIN'] = PriceSpy.mapper_spy_price
+        env_bond['MAIN'] = PriceSpy.mapper_main
         env_bond['SCODE'] = bond_scode
         env_bond['URL'] = r'http://quotes.money.163.com/bond/%s.html' % bond_scode
         env_bond['CACHE'] = os.path.join(cache_bond, '%s.price' % bond_scode)
