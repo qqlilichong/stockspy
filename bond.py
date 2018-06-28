@@ -149,7 +149,7 @@ if __name__ == '__main__':
     envlist.append(env_bondtimer)
     for bond_scode in bond_scodelist:
         env_bond = dict()
-        env_bond['NICE'] = float(7.5)
+        env_bond['NICE'] = float(15.0)
         env_bond['MAIN'] = PriceSpy.mapper_main
         env_bond['SCODE'] = bond_scode
         env_bond['URL'] = r'http://quotes.money.163.com/bond/%s.html' % bond_scode
